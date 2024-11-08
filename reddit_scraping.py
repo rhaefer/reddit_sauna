@@ -5,11 +5,9 @@ import os
 import time
 import pandas as pd
 from supabase import create_client, Client
-
-# Supabase connection details
-SUPABASE_URL = "https://nyngjfovyljrzeqnetgy.supabase.co"  # Replace with your Supabase URL
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bmdqZm92eWxqcnplcW5ldGd5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDgyNzQ4MCwiZXhwIjoyMDQ2NDAzNDgwfQ.3X_jAe8LdkqnBHTyIJyh5Y7_YL5KlxQDhfIup9FKh7c"  # Replace with your Supabase Key
-
+# Fetch Supabase credentials from environment variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 # Initialize Supabase client
 def initialize_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -62,14 +60,8 @@ if __name__ == "__main__":
     df = df[['id','subreddit', 'title','upvote_ratio','link_flair_text','score','author','num_comments','permalink','url','selftext']]
     append_to_supabase(df, supabase_client)
     
-
-# Supabase credentials
-url = "https://nyngjfovyljrzeqnetgy.supabase.co"  # Replace with your Supabase project URL
-api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bmdqZm92eWxqcnplcW5ldGd5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDgyNzQ4MCwiZXhwIjoyMDQ2NDAzNDgwfQ.3X_jAe8LdkqnBHTyIJyh5Y7_YL5KlxQDhfIup9FKh7c"  # Replace with your Supabase Key
-  # Replace with your Supabase API key
-
 # Create a Supabase client
-supabase: Client = create_client(url, api_key)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Initialize variables
 batch_size = 1000
