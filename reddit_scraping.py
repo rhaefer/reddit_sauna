@@ -1,18 +1,18 @@
 import httpx
 import pandas as pd
-from supabase import create_client, Client
 import os
 import time
-import pandas as pd
 from supabase import create_client, Client
-# Fetch Supabase credentials from environment variables
+
+# Supabase credentials from environment variables
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
 # Initialize Supabase client
 def initialize_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Fetch data from Reddit
+# Fetch data from Reddit with enhanced debugging and User-Agent header
 def fetch_reddit_data():
     base_url = 'https://www.reddit.com'
     endpoint = '/r/Sauna'
@@ -21,6 +21,9 @@ def fetch_reddit_data():
 
     after_post_id = None
     dataset = []
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
 
     for _ in range(5):
         params = {
@@ -28,16 +31,24 @@ def fetch_reddit_data():
             't': 'year',
             'after': after_post_id
         }
-        response = httpx.get(url, params=params)
-        if response.status_code != 200:
-            raise Exception('Failed to fetch data')
+        try:
+            response = httpx.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()  # Check if the request was successful
+            json_data = response.json()
+            dataset.extend([rec['data'] for rec in json_data['data']['children']])
 
-        json_data = response.json()
-        dataset.extend([rec['data'] for rec in json_data['data']['children']])
+            after_post_id = json_data['data']['after']
+            if not after_post_id:  # Exit if there's no more data
+                break
 
-        after_post_id = json_data['data']['after']
-        time.sleep(0.5)
-        
+            time.sleep(0.5)  # Rate-limiting to prevent bans
+        except httpx.RequestError as e:
+            print(f"Request error: {e}")
+            raise Exception("Failed to fetch data due to a network issue.")
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP error: {e}")
+            raise Exception("Failed to fetch data due to a bad status code.")
+
     return pd.DataFrame(dataset)
 
 # Append data to Supabase
@@ -59,30 +70,6 @@ if __name__ == "__main__":
     df = fetch_reddit_data()
     df = df[['id','subreddit', 'title','upvote_ratio','link_flair_text','score','author','num_comments','permalink','url','selftext']]
     append_to_supabase(df, supabase_client)
-    
-# Create a Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# Initialize variables
-batch_size = 1000
-start = 0
-all_data = []
-
-while True:
-    # Fetch data in batches
-    response = supabase.table("scraping_table").select("*").range(start, start + batch_size - 1).execute()
-    
-    # Break the loop if no more data is returned
-    if not response.data:
-        break
-
-    # Append the fetched data to the list
-    all_data.extend(response.data)
-    start += batch_size
-
-# Convert all data to a DataFrame
-df = pd.DataFrame(all_data)
-
 
     
 
