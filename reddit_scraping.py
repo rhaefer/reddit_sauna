@@ -1,55 +1,58 @@
+import praw
 import httpx
 import pandas as pd
+from supabase import create_client, Client
 import os
 import time
+import pandas as pd
 from supabase import create_client, Client
 
-# Supabase credentials from environment variables
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# Supabase connection details
+SUPABASE_URL = "https://nyngjfovyljrzeqnetgy.supabase.co"  # Replace with your Supabase URL
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bmdqZm92eWxqcnplcW5ldGd5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDgyNzQ4MCwiZXhwIjoyMDQ2NDAzNDgwfQ.3X_jAe8LdkqnBHTyIJyh5Y7_YL5KlxQDhfIup9FKh7c"  # Replace with your Supabase Key
 
 # Initialize Supabase client
 def initialize_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Fetch data from Reddit with enhanced debugging and User-Agent header
-def fetch_reddit_data():
-    base_url = 'https://www.reddit.com'
-    endpoint = '/r/Sauna'
-    category = '/new'
-    url = base_url + endpoint + category + ".json"
+# Initialize PRAW with your credentials
+reddit = praw.Reddit(
+    client_id="hTujd0OmhH9KsGFt_jut4Q",
+    client_secret="WWCqKzEDpktPGdT9-CZ8sAaV28bj2A",
+    user_agent="sauna app v1.0 by /u/reidhaefer"  # e.g., 'myAppName v1.0 by /u/your_reddit_username'
+)
 
-    after_post_id = None
-    dataset = []
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+ #Access the r/Sauna subreddit and get the latest posts
+subreddit = reddit.subreddit("Sauna")
+
+# List to store each post's data
+posts_data = []
+
+# Fetch posts and add to list
+for post in subreddit.new(limit=1000):  # Adjust limit as needed
+    post_info = {
+        "title": post.title,
+        "score": post.score,
+        "upvote_ratio": post.upvote_ratio,
+        "link_flair_text": post.link_flair_text,
+        "author": str(post.author),  # Convert author to string
+        "num_comments": post.num_comments,
+        "permalink": post.permalink,
+        "url": post.url,
+        "selftext": post.selftext,
+        "id": post.id,
+        "subreddit": post.subreddit.display_name,
+        "created": post.created_utc
     }
+    posts_data.append(post_info)
 
-    for _ in range(5):
-        params = {
-            'limit': 100,
-            't': 'year',
-            'after': after_post_id
-        }
-        try:
-            response = httpx.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()  # Check if the request was successful
-            json_data = response.json()
-            dataset.extend([rec['data'] for rec in json_data['data']['children']])
+# Convert list of dictionaries to DataFrame
+df1 = pd.DataFrame(posts_data)
+df = pd.DataFrame(posts_data)
 
-            after_post_id = json_data['data']['after']
-            if not after_post_id:  # Exit if there's no more data
-                break
+data_full = pd.concat([df, df1], axis=0, ignore_index=True)
 
-            time.sleep(0.5)  # Rate-limiting to prevent bans
-        except httpx.RequestError as e:
-            print(f"Request error: {e}")
-            raise Exception("Failed to fetch data due to a network issue.")
-        except httpx.HTTPStatusError as e:
-            print(f"HTTP error: {e}")
-            raise Exception("Failed to fetch data due to a bad status code.")
-
-    return pd.DataFrame(dataset)
+data = data_full.drop_duplicates(subset='id', keep='first')
 
 # Append data to Supabase
 def append_to_supabase(df, supabase_client):
@@ -67,10 +70,6 @@ def append_to_supabase(df, supabase_client):
 if __name__ == "__main__":
     # Fetch data and save to Supabase
     supabase_client = initialize_supabase()
-    df = fetch_reddit_data()
-    df = df[['id','subreddit', 'title','upvote_ratio','link_flair_text','score','author','num_comments','permalink','url','selftext']]
+    df = data
     append_to_supabase(df, supabase_client)
-
-    
-
 
