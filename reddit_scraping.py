@@ -29,7 +29,7 @@ subreddit = reddit.subreddit("Sauna")
 posts_data = []
 
 # Fetch posts and add to list
-for post in subreddit.new(limit=1000):  # Adjust limit as needed
+for post in subreddit.new(limit=100):  # Adjust limit as needed
     post_info = {
         "title": post.title,
         "score": post.score,
