@@ -42,6 +42,7 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
         "selftext": post.selftext,
         "id": post.id,
         "subreddit": post.subreddit.display_name,
+        "imageurl": post.imageurl,
         "created": post.created_utc
     }
     posts_data.append(post_info)
