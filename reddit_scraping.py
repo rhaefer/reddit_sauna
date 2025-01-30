@@ -11,6 +11,24 @@ from supabase import create_client, Client
 SUPABASE_URL = "https://nyngjfovyljrzeqnetgy.supabase.co"  # Replace with your Supabase URL
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bmdqZm92eWxqcnplcW5ldGd5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDgyNzQ4MCwiZXhwIjoyMDQ2NDAzNDgwfQ.3X_jAe8LdkqnBHTyIJyh5Y7_YL5KlxQDhfIup9FKh7c"  # Replace with your Supabase Key
 
+import mimetypes
+
+def get_image_url(post):
+    """Extract the correct image URL from a Reddit post."""
+    # If the post contains media metadata (gallery)
+    if hasattr(post, "media_metadata") and post.media_metadata:
+        for item in post.media_metadata.values():
+            if "s" in item and "u" in item["s"]:  # Check for available media
+                return item["s"]["u"].replace("&amp;", "&")  # Correct encoding
+    
+    # If the post's URL is an image (jpg, png, gif)
+    mime_type, _ = mimetypes.guess_type(post.url)
+    if mime_type and mime_type.startswith("image"):
+        return post.url
+    
+    # If no image found, return None
+    return None
+
 # Initialize Supabase client
 def initialize_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -42,7 +60,7 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
         "selftext": post.selftext,
         "id": post.id,
         "subreddit": post.subreddit.display_name,
-        "imageurl": post.imageurl,
+        "imageurl": get_image_url(post),  # ✅ Updated to correctly extract image
         "created": post.created_utc
     }
     posts_data.append(post_info)
