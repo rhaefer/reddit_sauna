@@ -51,7 +51,7 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
     post_info = {
         "title": post.title,
         "score": post.score,
-        "upvotes": post.upvotes,
+        #"upvotes": post.upvotes,
         "upvote_ratio": post.upvote_ratio,
         "link_flair_text": post.link_flair_text,
         "author": str(post.author),  # Convert author to string
