@@ -12,53 +12,22 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 def initialize_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ✅ Function to get existing post IDs from Supabase (to avoid duplicates)
+# ✅ Get existing post IDs from Supabase (to avoid duplicates)
 def get_existing_post_ids(supabase_client):
     response = supabase_client.table("scraping_table").select("id").execute()
     if response.data:
         return set(row["id"] for row in response.data)
     return set()
 
-# ✅ Function to clean up existing duplicates in Supabase
-def remove_existing_duplicates(supabase_client):
-    response = supabase_client.table("scraping_table").select("*").execute()
-
-    if not response.data:
-        print("✅ No existing posts found in Supabase.")
-        return
-
-    # ✅ Convert to DataFrame
-    df_existing = pd.DataFrame(response.data)
-
-    # ✅ Remove duplicates (keep the first occurrence)
-    df_cleaned = df_existing.drop_duplicates(subset='id', keep='first')
-
-    if len(df_cleaned) == len(df_existing):
-        print("✅ No duplicates found in Supabase. No cleanup needed.")
-        return
-
-    print(f"⚠️ Removing {len(df_existing) - len(df_cleaned)} duplicate posts from Supabase...")
-
-    # ✅ Delete all existing rows (wipe table)
-    supabase_client.table("scraping_table").delete().neq("id", "0").execute()
-
-    # ✅ Reinsert only cleaned data
-    records = df_cleaned.to_dict(orient='records')
-    supabase_client.table("scraping_table").insert(records).execute()
-
-    print(f"✅ Cleanup complete. {len(df_cleaned)} unique posts remain.")
-
-# ✅ Function to get image URLs (handles different media formats)
+# ✅ Function to get image URLs
 def get_image_url(post):
     if hasattr(post, "media_metadata") and post.media_metadata:
         for item in post.media_metadata.values():
             if "s" in item and "u" in item["s"]:
                 return item["s"]["u"].replace("&amp;", "&")  # Fix encoding
-
     mime_type, _ = mimetypes.guess_type(post.url)
     if mime_type and mime_type.startswith("image"):
         return post.url
-
     return None
 
 # ✅ Initialize Reddit API (PRAW)
@@ -74,16 +43,13 @@ subreddit = reddit.subreddit("Sauna")
 # ✅ Initialize Supabase
 supabase_client = initialize_supabase()
 
-# ✅ Remove old duplicates from Supabase
-remove_existing_duplicates(supabase_client)
-
-# ✅ Get existing post IDs to prevent new duplicates
+# ✅ Get existing post IDs to avoid inserting duplicates
 existing_post_ids = get_existing_post_ids(supabase_client)
 
 # ✅ Fetch new posts from Reddit
 posts_data = []
-for post in subreddit.new(limit=100):
-    if post.id not in existing_post_ids:  # ✅ Avoid inserting duplicates
+for post in subreddit.new(limit=100):  # Adjust limit as needed
+    if post.id not in existing_post_ids:  # ✅ **Avoid inserting duplicates**
         post_info = {
             "title": post.title,
             "score": post.score,
@@ -103,7 +69,7 @@ for post in subreddit.new(limit=100):
 
 # ✅ Convert to DataFrame and remove duplicates (before inserting)
 df_new = pd.DataFrame(posts_data)
-df_new = df_new.drop_duplicates(subset='id', keep='first')
+df_new = df_new.drop_duplicates(subset='id', keep='first')  # Extra safety measure
 
 # ✅ Function to insert new unique posts into Supabase
 def append_to_supabase(df, supabase_client):
