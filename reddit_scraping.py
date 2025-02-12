@@ -4,7 +4,7 @@ from supabase import create_client, Client
 import os
 import mimetypes
 
-# Supabase connection details
+# ✅ Supabase connection details
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
@@ -12,7 +12,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 def initialize_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ✅ Get existing post IDs from Supabase (to avoid duplicates)
+# ✅ Get existing post IDs from Supabase
 def get_existing_post_ids(supabase_client):
     response = supabase_client.table("scraping_table").select("id").execute()
     if response.data:
@@ -43,7 +43,7 @@ subreddit = reddit.subreddit("Sauna")
 # ✅ Initialize Supabase
 supabase_client = initialize_supabase()
 
-# ✅ Get existing post IDs to avoid inserting duplicates
+# ✅ Get all existing post IDs to prevent inserting duplicates
 existing_post_ids = get_existing_post_ids(supabase_client)
 
 # ✅ Fetch new posts from Reddit
@@ -71,7 +71,7 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
 df_new = pd.DataFrame(posts_data)
 df_new = df_new.drop_duplicates(subset='id', keep='first')  # Extra safety measure
 
-# ✅ Function to insert new unique posts into Supabase
+# ✅ Insert only **new unique posts** into Supabase
 def append_to_supabase(df, supabase_client):
     if df.empty:
         print("✅ No new posts to insert.")
