@@ -75,15 +75,15 @@ df_new = df_new.drop_duplicates(subset='id', keep='first')  # Extra safety measu
 def append_to_supabase(df, supabase_client):
     if df.empty:
         print("✅ No new posts to insert.")
-        return
-
-    records = df.to_dict(orient='records')
-    response = supabase_client.table("scraping_table").insert(records).execute()
-
-    if response.data:
-        print(f"✅ Inserted {len(response.data)} new records into Supabase.")
+        pass  # ✅ This ensures the script continues
     else:
-        print(f"⚠️ Error inserting records: {response}")
+        records = df.to_dict(orient='records')
+        response = supabase_client.table("scraping_table").insert(records).execute()
+
+        if response.data:
+            print(f"✅ Inserted {len(response.data)} new records into Supabase.")
+        else:
+            print(f"⚠️ Error inserting records: {response}")
 
 # ✅ Get existing comment IDs from Supabase
 def get_existing_comment_ids(supabase_client):
