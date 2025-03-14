@@ -143,5 +143,10 @@ def append_to_supabase2(df, supabase_client):
         
 # ✅ Run the script
 if __name__ == "__main__":
+    print("🚀 Running post scraper...")
     append_to_supabase(df_new, supabase_client)
+
+    print("🚀 Running comment scraper...")
     append_to_supabase2(df_comments, supabase_client)
+
+    print("✅ Script finished running.")
