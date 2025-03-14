@@ -85,13 +85,6 @@ def append_to_supabase(df, supabase_client):
     else:
         print(f"⚠️ Error inserting records: {response}")
 
-# ✅ Run the script
-if __name__ == "__main__":
-    append_to_supabase(df_new, supabase_client)
-
-# ✅ Initialize Supabase
-supabase_client = initialize_supabase()
-
 # ✅ Get existing comment IDs from Supabase
 def get_existing_comment_ids(supabase_client):
     response = supabase_client.table("reddit_sauna_comments").select("id").execute()
@@ -147,7 +140,8 @@ def append_to_supabase2(df, supabase_client):
         print(f"✅ Inserted {len(response.data)} new comments into Supabase.")
     else:
         print(f"⚠️ Error inserting comments: {response}")
-
+        
 # ✅ Run the script
 if __name__ == "__main__":
+    append_to_supabase(df_new, supabase_client)
     append_to_supabase2(df_comments, supabase_client)
