@@ -88,3 +88,66 @@ def append_to_supabase(df, supabase_client):
 # ✅ Run the script
 if __name__ == "__main__":
     append_to_supabase(df_new, supabase_client)
+
+# ✅ Initialize Supabase
+supabase_client = initialize_supabase()
+
+# ✅ Get existing comment IDs from Supabase
+def get_existing_comment_ids(supabase_client):
+    response = supabase_client.table("reddit_sauna_comments").select("id").execute()
+    if response.data:
+        return set(row["id"] for row in response.data)
+    return set()
+
+# ✅ Get post IDs from Supabase (to scrape comments for these posts)
+def get_post_ids(supabase_client):
+    response = supabase_client.table("scraping_table").select("id").execute()
+    if response.data:
+        return [row["id"] for row in response.data]
+    return []
+
+# ✅ Get existing comments to prevent inserting duplicates
+existing_comment_ids = get_existing_comment_ids(supabase_client)
+
+# ✅ Get all post IDs from Supabase
+post_ids = get_post_ids(supabase_client)
+
+# ✅ Fetch and store comments
+comments_data = []
+for post_id in post_ids:
+    submission = reddit.submission(id=post_id)
+    submission.comments.replace_more(limit=0)  # Expand comments fully
+
+    for comment in submission.comments.list():
+        if comment.id not in existing_comment_ids:  # ✅ Avoid inserting duplicates
+            comment_info = {
+                "id": comment.id,
+                "post_id": post_id,
+                "author": str(comment.author) if comment.author else "[deleted]",
+                "body": comment.body,
+                "score": comment.score,
+                "created": comment.created_utc,
+            }
+            comments_data.append(comment_info)
+
+# ✅ Convert to DataFrame and remove duplicates (before inserting)
+df_comments = pd.DataFrame(comments_data)
+df_comments = df_comments.drop_duplicates(subset="id", keep="first")  # Extra safety
+
+# ✅ Insert only **new unique comments** into Supabase
+def append_to_supabase2(df, supabase_client):
+    if df.empty:
+        print("✅ No new comments to insert.")
+        return
+
+    records = df.to_dict(orient="records")
+    response = supabase_client.table("reddit_sauna_comments").insert(records).execute()
+
+    if response.data:
+        print(f"✅ Inserted {len(response.data)} new comments into Supabase.")
+    else:
+        print(f"⚠️ Error inserting comments: {response}")
+
+# ✅ Run the script
+if __name__ == "__main__":
+    append_to_supabase2(df_comments, supabase_client)
