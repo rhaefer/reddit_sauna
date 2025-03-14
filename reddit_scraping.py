@@ -71,24 +71,29 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
         }
         posts_data.append(post_info)
 
-        # ✅ Fetch comments for this post
-        submission = reddit.submission(id=post.id)
-        submission.comments.replace_more(limit=0)  # Expand comments fully
-
-        print(f"🔍 Fetching comments for post ID: {post.id} ({post.title[:30]}...)")
-        for comment in submission.comments.list():
-            if comment.id not in existing_comment_ids:  # ✅ Avoid inserting duplicates
-                comment_info = {
-                    "id": comment.id,
-                    "post_id": post.id,
-                    "author": str(comment.author) if comment.author else "[deleted]",
-                    "body": comment.body,
-                    "score": comment.score,
-                    "created": comment.created_utc,
-                }
-                comments_data.append(comment_info)
-
 print(f"✅ Total new posts scraped: {len(posts_data)}")
+
+# ✅ Fetch and store comments for all posts (new and existing)
+post_ids = get_existing_ids(supabase_client, "scraping_table", "id")
+
+print("🚀 Fetching comments for all posts...")
+for post_id in post_ids:
+    submission = reddit.submission(id=post_id)
+    submission.comments.replace_more(limit=0)  # Expand comments fully
+
+    print(f"🔍 Fetching comments for post ID: {post_id}")
+    for comment in submission.comments.list():
+        if comment.id not in existing_comment_ids:  # ✅ Avoid inserting duplicates
+            comment_info = {
+                "id": comment.id,
+                "post_id": post_id,
+                "author": str(comment.author) if comment.author else "[deleted]",
+                "body": comment.body,
+                "score": comment.score,
+                "created": comment.created_utc,
+            }
+            comments_data.append(comment_info)
+
 print(f"✅ Total new comments scraped: {len(comments_data)}")
 
 # ✅ Insert both posts and comments into Supabase
@@ -98,12 +103,16 @@ def append_to_supabase(posts, comments, supabase_client):
         post_response = supabase_client.table("scraping_table").insert(posts).execute()
         if post_response.data:
             print(f"✅ Inserted {len(post_response.data)} posts.")
+        else:
+            print("⚠️ Error inserting posts.")
 
     if comments:
         print(f"🚀 Inserting {len(comments)} new comments...")
         comment_response = supabase_client.table("reddit_sauna_comments").insert(comments).execute()
         if comment_response.data:
             print(f"✅ Inserted {len(comment_response.data)} comments.")
+        else:
+            print("⚠️ Error inserting comments.")
 
 # ✅ Run the script
 if __name__ == "__main__":
