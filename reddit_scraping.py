@@ -12,6 +12,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 def initialize_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ✅ Convert Unix timestamp to readable datetime format
+def convert_timestamp(unix_timestamp):
+    return datetime.utcfromtimestamp(float(unix_timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+
 # ✅ Get existing post and comment IDs from Supabase
 def get_existing_ids(supabase_client, table_name, column_name):
     response = supabase_client.table(table_name).select(column_name).execute()
@@ -67,7 +71,7 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
             "id": post.id,
             "subreddit": post.subreddit.display_name,
             "imageurl": get_image_url(post),
-            "created": post.created_utc
+            "created": convert_timestamp(post.created_utc)  # ✅ Store as readable datetime
         }
         posts_data.append(post_info)
 
@@ -90,7 +94,7 @@ for post_id in post_ids:
                 "author": str(comment.author) if comment.author else "[deleted]",
                 "body": comment.body,
                 "score": comment.score,
-                "created": comment.created_utc,
+                "created": convert_timestamp(comment.created_utc)  # ✅ Store as readable datetime
             }
             comments_data.append(comment_info)
 
