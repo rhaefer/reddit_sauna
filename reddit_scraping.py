@@ -3,7 +3,9 @@ import pandas as pd
 from supabase import create_client
 import os
 import mimetypes
+import time
 from datetime import datetime
+from prawcore.exceptions import TooManyRequests, RequestException
 
 # ✅ Supabase connection details
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -35,7 +37,7 @@ def get_image_url(post):
         return post.url
     return None
 
-# ✅ Initialize Reddit API (PRAW)
+# ✅ Initialize Reddit API (PRAW) with rate limit handling
 reddit = praw.Reddit(
     client_id="hTujd0OmhH9KsGFt_jut4Q",
     client_secret="WWCqKzEDpktPGdT9-CZ8sAaV28bj2A",
@@ -57,9 +59,10 @@ posts_data = []
 comments_data = []
 
 print("🚀 Fetching new posts...")
-for post in subreddit.new(limit=100):  # Adjust limit as needed
+for post in subreddit.new(limit=50):  # Reduce limit to avoid hitting rate limits
     if post.id not in existing_post_ids:  # ✅ Avoid inserting duplicates
         post_info = {
+            "id": post.id,  # ✅ Primary key (must be unique)
             "title": post.title,
             "score": post.score,
             "upvote_ratio": post.upvote_ratio,
@@ -69,7 +72,6 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
             "permalink": post.permalink,
             "url": post.url,
             "selftext": post.selftext,
-            "id": post.id,
             "subreddit": post.subreddit.display_name,
             "imageurl": get_image_url(post),
             "created": convert_timestamp(post.created_utc)  # ✅ Store as readable datetime
@@ -79,43 +81,54 @@ for post in subreddit.new(limit=100):  # Adjust limit as needed
 print(f"✅ Total new posts scraped: {len(posts_data)}")
 
 # ✅ Fetch and store comments for all posts (new and existing)
-post_ids = get_existing_ids(supabase_client, "scraping_table", "id")
+post_ids = list(existing_post_ids)[:20]  # ✅ Limit the number of posts to prevent excessive API calls
 
 print("🚀 Fetching comments for all posts...")
 for post_id in post_ids:
-    submission = reddit.submission(id=post_id)
-    submission.comments.replace_more(limit=0)  # Expand comments fully
+    try:
+        time.sleep(2)  # ✅ Add delay to avoid hitting rate limits
+        submission = reddit.submission(id=post_id)
+        submission.comments.replace_more(limit=0)  # Expand comments fully
 
-    print(f"🔍 Fetching comments for post ID: {post_id}")
-    for comment in submission.comments.list():
-        if comment.id not in existing_comment_ids:  # ✅ Avoid inserting duplicates
-            comment_info = {
-                "id": comment.id,
-                "post_id": post_id,
-                "author": str(comment.author) if comment.author else "[deleted]",
-                "body": comment.body,
-                "score": comment.score,
-                "created": convert_timestamp(comment.created_utc)  # ✅ Store as readable datetime
-            }
-            comments_data.append(comment_info)
+        print(f"🔍 Fetching comments for post ID: {post_id}")
+        for comment in submission.comments.list():
+            if comment.id not in existing_comment_ids:  # ✅ Avoid inserting duplicates
+                comment_info = {
+                    "id": comment.id,  # ✅ Primary key (must be unique)
+                    "post_id": post_id,
+                    "author": str(comment.author) if comment.author else "[deleted]",
+                    "body": comment.body,
+                    "score": comment.score,
+                    "created": convert_timestamp(comment.created_utc)
+                }
+                comments_data.append(comment_info)
+
+    except TooManyRequests:
+        print("⚠️ Too many requests! Pausing for 60 seconds...")
+        time.sleep(60)  # Wait and retry
+        continue
+
+    except RequestException as e:
+        print(f"⚠️ Request error for post {post_id}: {e}")
+        continue  # Skip to the next post
 
 print(f"✅ Total new comments scraped: {len(comments_data)}")
 
-# ✅ Insert both posts and comments into Supabase
+# ✅ Insert both posts and comments into Supabase (Fix for duplicate key error)
 def append_to_supabase(posts, comments, supabase_client):
     if posts:
-        print(f"🚀 Inserting {len(posts)} new posts...")
-        post_response = supabase_client.table("scraping_table").insert(posts).execute()
+        print(f"🚀 Upserting {len(posts)} new posts...")
+        post_response = supabase_client.table("scraping_table").upsert(posts, on_conflict="id").execute()
         if post_response.data:
-            print(f"✅ Inserted {len(post_response.data)} posts.")
+            print(f"✅ Upserted {len(post_response.data)} posts.")
         else:
             print("⚠️ Error inserting posts.")
 
     if comments:
-        print(f"🚀 Inserting {len(comments)} new comments...")
-        comment_response = supabase_client.table("reddit_sauna_comments").insert(comments).execute()
+        print(f"🚀 Upserting {len(comments)} new comments...")
+        comment_response = supabase_client.table("reddit_sauna_comments").upsert(comments, on_conflict="id").execute()
         if comment_response.data:
-            print(f"✅ Inserted {len(comment_response.data)} comments.")
+            print(f"✅ Upserted {len(comment_response.data)} comments.")
         else:
             print("⚠️ Error inserting comments.")
 
@@ -123,3 +136,5 @@ def append_to_supabase(posts, comments, supabase_client):
 if __name__ == "__main__":
     append_to_supabase(posts_data, comments_data, supabase_client)
     print("✅ Script finished running.")
+    
+    
